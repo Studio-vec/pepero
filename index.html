@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>빼빼로 캐치</title>
+<style>
+  :root { --red:#b8312a; --red-d:#9e2721; --choco:#5b2418; --choco-l:#7a3424; --biscuit:#e7b468; --white:#fff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--red-d); color:var(--white);
+    font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; overflow:hidden; touch-action:none; }
+  html,body { height:100dvh; overscroll-behavior:none; }
+  #wrap { position:relative; width:100%; max-width:480px; height:100%; margin:0 auto; background:var(--red); overflow:hidden; }
+  canvas { display:block; width:100%; height:100%; }
+  #hud { position:absolute; top:12px; left:14px; right:14px; display:flex; justify-content:space-between; align-items:center;
+    font-weight:900; font-size:20px; font-style:italic; pointer-events:none; text-shadow:0 2px 0 #0002; }
+  #overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:24px; background:var(--red); }
+  .badge { display:inline-flex; align-items:center; gap:6px; font-weight:900; font-size:18px; letter-spacing:2px; margin-bottom:10px; }
+  .badge i { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background:#fff; color:var(--red); font-style:normal; font-size:15px; }
+  #overlay { overflow:hidden; }
+  h1 { margin:0; font-size:clamp(44px,9vh,64px); line-height:1; font-weight:900; transform:skewX(-12deg); letter-spacing:-2px; }
+  .sub { font-weight:900; font-style:italic; font-size:22px; margin:4px 0 18px; border-top:3px solid #fff; padding-top:4px; display:inline-block; }
+  #overlay p { margin:6px 0; line-height:1.5; }
+  .legend { display:flex; gap:14px; justify-content:center; margin:10px 0; }
+  .legend div { display:flex; flex-direction:column; align-items:center; font-weight:700; font-size:14px; }
+  .legend canvas { width:56px; height:56px; }
+  #result { min-height:1.5em; }
+  #overlay button { margin-top:16px; font:inherit; font-weight:900; font-style:italic; font-size:22px; padding:12px 40px;
+    border:0; border-radius:999px; background:#fff; color:var(--red); cursor:pointer; box-shadow:0 4px 0 #0003; }
+  #overlay button:active { transform:translateY(2px); box-shadow:0 2px 0 #0003; }
+  .hint { opacity:.75; font-size:14px; }
+  .hidden { display:none !important; }
+
+  /* 엔딩 */
+  #ending { position:absolute; inset:0; overflow:hidden; background:var(--ebg, var(--red));
+    display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; text-align:center; animation:fade .5s ease; }
+  @keyframes fade { from { opacity:0; transform:scale(1.04); } to { opacity:1; transform:none; } }
+  #ending .no { font-weight:900; font-size:13px; letter-spacing:3px; opacity:.8; }
+  #ending canvas.icon { width:min(110px,15vh); height:min(110px,15vh); margin:4px 0 0; animation:pop .6s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes pop { from { transform:scale(.3) rotate(-20deg); opacity:0; } to { transform:none; opacity:1; } }
+  #ending h2 { margin:0; font-size:clamp(28px,5.5vh,40px); font-weight:900; line-height:1.05; transform:skewX(-10deg); letter-spacing:-1px; }
+  #ending .desc { margin:8px 0 12px; line-height:1.45; font-size:14px; max-width:320px; }
+  .card { width:100%; max-width:300px; border:2px solid #fff; text-align:left; font-size:13px; }
+  .card .head { display:flex; justify-content:space-between; align-items:flex-end; padding:5px 10px; border-bottom:3px solid #fff; }
+  .card .head b { font-size:17px; }
+  .card .head span { text-align:right; font-size:11px; }
+  .card .head span strong { display:block; font-size:18px; font-style:italic; }
+  .card .row { display:flex; justify-content:space-between; padding:3px 10px; border-bottom:1px solid #fff8; }
+  .card .row:last-child { border-bottom:0; }
+  .card .row.indent { padding-left:24px; }
+  #ending .btns { display:flex; gap:10px; margin-top:14px; }
+  #ending button { font:inherit; font-weight:900; font-style:italic; font-size:17px; padding:10px 24px; border-radius:999px; cursor:pointer;
+    border:2px solid #fff; background:#fff; color:var(--ebg, var(--red)); }
+  #ending button.ghost { background:transparent; color:#fff; }
+  .confetti { position:absolute; top:-30px; pointer-events:none; animation:fall linear infinite; opacity:.85; }
+  @keyframes fall { to { transform:translateY(110vh) rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="hud"><span id="score">0</span><span id="time">30</span><span id="lives"></span></div>
+  <div id="overlay">
+    <div class="badge"><i>♥</i>LOVE</div>
+    <h1>빼빼로</h1>
+    <div class="sub">CATCH</div>
+    <p>떨어지는 빼빼로를 선물상자에 담으세요!</p>
+    <div class="legend">
+      <div><canvas data-k="stick"></canvas>+1</div>
+      <div><canvas data-k="heart"></canvas>+3</div>
+      <div><canvas data-k="broken"></canvas>♥ −1</div>
+    </div>
+    <p class="hint">드래그 · 마우스 · ← → 키 · 30초</p>
+    <p id="result"></p>
+    <button id="start">START</button>
+  </div>
+  <div id="ending" class="hidden">
+    <div class="no" id="eNo"></div>
+    <canvas class="icon" id="eIcon"></canvas>
+    <h2 id="eTitle"></h2>
+    <p class="desc" id="eDesc"></p>
+    <div class="card">
+      <div class="head"><b>영양정보</b><span>총 설렘<strong id="eKcal"></strong></span></div>
+      <div id="eRows"></div>
+    </div>
+    <div class="btns"><button id="retry">RETRY</button><button class="ghost" id="home">처음으로</button></div>
+  </div>
+</div>
+<script>
+(() => {
+  const C = { red:'#b8312a', choco:'#5b2418', chocoL:'#7a3424', chocoHi:'#9a4a36', biscuit:'#e7b468', biscuitD:'#c98f45' };
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const overlay = $('overlay'), result = $('result'), startBtn = $('start');
+  let W, H;
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    makeBg();
+  }
+
+  // ---------- 그리기 ----------
+  function stickPath(g, pts, coatColor) {
+    // pts: 비스킷 끝 → 코팅 끝
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.lineWidth = 7; g.strokeStyle = coatColor;
+    g.beginPath(); g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.stroke();
+  }
+
+  function drawStick(g) {
+    g.lineCap = 'round';
+    g.lineWidth = 7; g.strokeStyle = C.choco;
+    g.beginPath(); g.moveTo(0, -30); g.lineTo(0, 14); g.stroke();
+    g.lineWidth = 2; g.strokeStyle = C.chocoHi;
+    g.beginPath(); g.moveTo(-1.5, -27); g.lineTo(-1.5, 10); g.stroke();
+    g.lineWidth = 7; g.strokeStyle = C.biscuit;
+    g.beginPath(); g.moveTo(0, 16); g.lineTo(0, 30); g.stroke();
+  }
+
+  function heartStick(g, m) { // m = 1 or -1 (좌우 대칭)
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.lineWidth = 6; g.strokeStyle = C.chocoL;
+    g.beginPath(); g.moveTo(-9*m, 18); g.lineTo(8*m, -6);
+    g.bezierCurveTo(16*m, -18, 10*m, -30, 2*m, -26); g.lineTo(0.5*m, -20); g.stroke();
+    g.strokeStyle = C.biscuit;
+    g.beginPath(); g.moveTo(-14*m, 26); g.lineTo(-10*m, 19); g.stroke();
+  }
+  function drawHeart(g) { heartStick(g, -1); heartStick(g, 1); }
+
+  function heartShape(g, s) {
+    g.beginPath();
+    g.moveTo(0, s*0.38);
+    g.bezierCurveTo(-s*1.05, -s*0.2, -s*0.5, -s*1.0, 0, -s*0.45);
+    g.bezierCurveTo(s*0.5, -s*1.0, s*1.05, -s*0.2, 0, s*0.38);
+    g.closePath();
+  }
+  const CRACK = [[0.02,-0.45],[-0.1,-0.2],[0.08,-0.02],[-0.06,0.18],[0.02,0.38]];
+  function drawBroken(g) {
+    const s = 26;
+    for (const side of [-1, 1]) {
+      g.save();
+      g.translate(side*3, side*1); g.rotate(side*0.08);
+      g.beginPath();
+      CRACK.forEach(([x,y],i) => i ? g.lineTo(x*s, y*s) : g.moveTo(x*s, y*s));
+      g.lineTo(side*s*1.2, s); g.lineTo(side*s*1.2, -s); g.closePath();
+      g.clip();
+      heartShape(g, s); g.fillStyle = C.chocoL; g.fill();
+      g.fillStyle = C.chocoHi; g.beginPath(); g.ellipse(side*10, -12, 4, 2.5, side*-0.6, 0, Math.PI*2); g.fill();
+      g.restore();
+    }
+    g.fillStyle = C.choco;
+    [[8,12,3],[13,6,2],[-5,16,2],[16,14,1.5]].forEach(([x,y,r]) => { g.beginPath(); g.moveTo(x,y-r); g.lineTo(x+r,y+r); g.lineTo(x-r,y+r*0.6); g.fill(); });
+  }
+
+  const DRAW = { stick: drawStick, heart: drawHeart, broken: drawBroken };
+  const TYPES = [
+    { key:'stick',  w:62, pts:1 },
+    { key:'heart',  w:16, pts:3 },
+    { key:'broken', w:22, pts:0, bad:true },
+  ];
+  const pickType = () => {
+    let r = Math.random() * TYPES.reduce((s,t)=>s+t.w,0);
+    for (const t of TYPES) if ((r -= t.w) < 0) return t;
+    return TYPES[0];
+  };
+
+  // 배경: 큰 워터마크 + 초콜릿 조각
+  let bg;
+  function makeBg() {
+    bg = document.createElement('canvas');
+    const dpr = window.devicePixelRatio || 1;
+    bg.width = W*dpr; bg.height = H*dpr;
+    const g = bg.getContext('2d'); g.scale(dpr, dpr);
+    g.fillStyle = C.red; g.fillRect(0,0,W,H);
+    g.save(); g.globalAlpha = 0.07; g.fillStyle = '#fff';
+    g.font = `900 ${Math.min(W*0.42, 200)}px system-ui, "Malgun Gothic", sans-serif`;
+    g.translate(W/2, H*0.45); g.rotate(-0.12); g.transform(1,0,-0.2,1,0,0); g.textAlign = 'center';
+    g.fillText('빼빼', 0, -20); g.fillText('로', 0, Math.min(W*0.42,200)*0.9);
+    g.restore();
+    let seed = 7; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 9; i++) {
+      const x = rnd()*W, y = 60 + rnd()*(H-200), r = 6 + rnd()*10;
+      g.save(); g.translate(x,y); g.rotate(rnd()*6); g.globalAlpha = 0.35;
+      g.fillStyle = C.choco; g.beginPath(); g.moveTo(-r,-r*0.6); g.lineTo(r*0.8,-r); g.lineTo(r,r*0.7); g.lineTo(-r*0.5,r); g.closePath(); g.fill();
+      g.restore();
+    }
+  }
+
+  // ---------- 게임 ----------
+  let best = 0; try { best = +localStorage.getItem('pepero-best') || 0; } catch {}
+  let state = 'menu', score, lives, timeLeft, items, pops, crumbs, box, spawnT, last, shake = 0, keys = {}, stats;
+
+  function reset() {
+    stats = { stick:0, heart:0, broken:0, miss:0 };
+    score = 0; lives = 3; timeLeft = 30; items = []; pops = []; crumbs = []; spawnT = 0;
+    box = { x: W/2, w: 90, h: 50, tx: W/2 };
+  }
+
+  function spawn() {
+    const t = pickType(), elapsed = 30 - timeLeft;
+    items.push({ t, x: 24 + Math.random()*(W-48), y: -40,
+      vy: 150 + elapsed*6 + Math.random()*60, rot: (Math.random()-.5)*.6, vr: (Math.random()-.5)*2.4 });
+  }
+
+  function drawBox() {
+    const { x, w, h } = box, y = H - h - 22;
+    ctx.fillStyle = '#0002';
+    ctx.beginPath(); ctx.ellipse(x, y+h+6, w*0.5, 6, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.roundRect(x-w/2, y, w, h, 6); ctx.fill();
+    ctx.fillStyle = C.choco;
+    ctx.fillRect(x-5, y, 10, h);
+    // 리본
+    ctx.beginPath(); ctx.ellipse(x-11, y-5, 11, 6, -0.45, 0, Math.PI*2); ctx.ellipse(x+11, y-5, 11, 6, 0.45, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y-3, 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = C.red; ctx.font = '900 18px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('♥', x - w/4 - 2, y + h/2 + 6); ctx.fillText('♥', x + w/4 + 2, y + h/2 + 6);
+  }
+
+  function addPop(x, y, text) { pops.push({ x, y, text, life: 0.8 }); }
+  function burst(x, y) {
+    for (let i = 0; i < 10; i++) crumbs.push({ x, y, vx:(Math.random()-.5)*260, vy:-Math.random()*220, r:2+Math.random()*3, life:0.7 });
+  }
+
+  function update(dt) {
+    timeLeft -= dt;
+    if (timeLeft <= 0 || lives <= 0) return end();
+    spawnT -= dt;
+    if (spawnT <= 0) { spawn(); spawnT = Math.max(0.28, 0.7 - (30-timeLeft)*0.012); }
+
+    if (keys.ArrowLeft) box.tx -= 540*dt;
+    if (keys.ArrowRight) box.tx += 540*dt;
+    box.tx = Math.max(box.w/2, Math.min(W-box.w/2, box.tx));
+    box.x += (box.tx - box.x) * Math.min(1, dt*18);
+    shake = Math.max(0, shake - dt);
+
+    const top = H - box.h - 22;
+    for (let i = items.length-1; i >= 0; i--) {
+      const it = items[i];
+      it.y += it.vy*dt; it.rot += it.vr*dt;
+      if (it.y + 24 >= top && it.y < top + 22 && Math.abs(it.x - box.x) < box.w/2 + 6) {
+        stats[it.t.key]++;
+        if (it.t.bad) { lives--; shake = 0.3; burst(it.x, top); addPop(it.x, top-10, '−♥'); navigator.vibrate?.(80); }
+        else { score += it.t.pts; addPop(it.x, top-10, '+' + it.t.pts); }
+        items.splice(i,1);
+      } else if (it.y > H + 50) { if (!it.t.bad) stats.miss++; items.splice(i,1); }
+    }
+    for (let i = pops.length-1; i >= 0; i--) { const p = pops[i]; p.life -= dt; p.y -= 44*dt; if (p.life <= 0) pops.splice(i,1); }
+    for (let i = crumbs.length-1; i >= 0; i--) { const c = crumbs[i]; c.life -= dt; c.vy += 600*dt; c.x += c.vx*dt; c.y += c.vy*dt; if (c.life <= 0) crumbs.splice(i,1); }
+  }
+
+  function render() {
+    ctx.save();
+    if (shake) ctx.translate((Math.random()-.5)*10*shake/0.3, 0);
+    ctx.drawImage(bg, 0, 0, W, H);
+    for (const it of items) { ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(it.rot); ctx.scale(1.35, 1.35); DRAW[it.t.key](ctx); ctx.restore(); }
+    drawBox();
+    ctx.fillStyle = C.choco;
+    for (const c of crumbs) { ctx.globalAlpha = c.life/0.7; ctx.fillRect(c.x, c.y, c.r, c.r); }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center'; ctx.font = '900 italic 24px system-ui'; ctx.fillStyle = '#fff';
+    for (const p of pops) { ctx.globalAlpha = Math.max(0, p.life/0.8); ctx.fillText(p.text, p.x, p.y); }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    $('score').textContent = score + '점';
+    $('time').textContent = Math.ceil(Math.max(0, timeLeft)) + 's';
+    $('lives').textContent = '♥'.repeat(Math.max(0,lives)) + '♡'.repeat(3 - Math.max(0,lives));
+  }
+
+  function loop(t) {
+    if (state !== 'play') return;
+    const dt = Math.min(0.05, (t - last)/1000); last = t;
+    update(dt);
+    if (state === 'play') { render(); requestAnimationFrame(loop); }
+  }
+
+  function start() {
+    resize(); reset(); state = 'play'; overlay.classList.add('hidden'); $('ending').classList.add('hidden');
+    last = performance.now(); requestAnimationFrame(loop);
+  }
+
+  function end() {
+    state = 'menu'; render();
+    const isBest = score > best;
+    if (isBest) { best = score; try { localStorage.setItem('pepero-best', best); } catch {} }
+    result.textContent = `최고 ${best}점`;
+    showEnding(isBest);
+  }
+
+  // ---------- 엔딩 ----------
+  const ENDINGS = [
+    { id:'broken', no:'BAD ENDING', bg:'#3b1a12', icon:'broken', title:'부서진 마음',
+      desc:'부러진 하트를 너무 많이 받았어요.<br>조각을 모아서… 다시 붙여볼까요?' },
+    { id:'solo', no:'ENDING 1 / 4', bg:'#8e3a2c', icon:'stick', title:'아직은 짝사랑',
+      desc:'빼빼로 한 개를 손에 쥐고<br>건넬까 말까 망설이는 중.' },
+    { id:'some', no:'ENDING 2 / 4', bg:'#b8312a', icon:'stick2', title:'썸 타는 중',
+      desc:'볼 생각에 매우 신남 ∞%.<br>내일 점심시간에 박스 잘라야지!' },
+    { id:'confess', no:'ENDING 3 / 4', bg:'#c2264b', icon:'heart', title:'고백 성공',
+      desc:'두 개의 빼빼로가 만나<br>하트가 되었어요.' },
+    { id:'forever', no:'TRUE ENDING', bg:'#5b2418', icon:'heart', title:'평생 빼빼로',
+      desc:'유통기한: 평생 (별도 표기 없음).<br>매년 11월 11일엔 같이 먹기로 해요.', confetti:true },
+  ];
+  function pickEnding() {
+    if (lives <= 0) return ENDINGS[0];
+    if (score >= 60) return ENDINGS[4];
+    if (score >= 35) return ENDINGS[3];
+    if (score >= 15) return ENDINGS[2];
+    return ENDINGS[1];
+  }
+
+  const ICON = {
+    stick: g => drawStick(g),
+    stick2: g => { g.save(); g.translate(-7,0); g.rotate(-0.25); drawStick(g); g.restore(); g.save(); g.translate(7,0); g.rotate(0.25); drawStick(g); g.restore(); },
+    heart: g => drawHeart(g),
+    broken: g => drawBroken(g),
+  };
+
+  let confettiEls = [];
+  function showEnding(isBest) {
+    const e = pickEnding(), el = $('ending');
+    el.style.setProperty('--ebg', e.bg);
+    $('eNo').textContent = e.no + (isBest ? ' · NEW BEST' : ` · BEST ${best}`);
+    $('eTitle').textContent = e.title;
+    $('eDesc').innerHTML = e.desc;
+    $('eKcal').textContent = score + ' kcal';
+
+    const caught = stats.stick + stats.heart, total = caught + stats.miss;
+    const rate = total ? Math.round(caught / total * 100) : 0;
+    const rows = [
+      ['받은 빼빼로', `${stats.stick}개`],
+      ['하트 빼빼로', `${stats.heart}개`, true],
+      ['부서진 마음', `${stats.broken}개`, true],
+      ['놓친 빼빼로', `${stats.miss}개`],
+      ['진심 (캐치율)', `${rate}%`],
+    ];
+    $('eRows').innerHTML = rows.map(([k,v,sub]) => `<div class="row${sub?' indent':''}"><span>${k}</span><b>${v}</b></div>`).join('');
+
+    const ic = $('eIcon'), d = window.devicePixelRatio || 1;
+    ic.width = ic.height = 110*d;
+    const g = ic.getContext('2d'); g.setTransform(d,0,0,d,0,0); g.translate(55,55); g.scale(1.75,1.75);
+    ICON[e.icon](g);
+    ic.style.animation = 'none'; ic.offsetWidth; ic.style.animation = '';
+
+    confettiEls.forEach(c => c.remove()); confettiEls = [];
+    if (e.confetti) for (let i = 0; i < 24; i++) {
+      const c = document.createElement('div');
+      c.className = 'confetti'; c.textContent = '♥';
+      c.style.left = Math.random()*100 + '%';
+      c.style.fontSize = 12 + Math.random()*18 + 'px';
+      c.style.color = ['#fff','#f2a2b0','#e7b468'][i%3];
+      c.style.animationDuration = 3 + Math.random()*4 + 's';
+      c.style.animationDelay = -Math.random()*6 + 's';
+      el.appendChild(c); confettiEls.push(c);
+    }
+    el.scrollTop = 0;
+    el.classList.remove('hidden');
+  }
+  $('retry').addEventListener('click', () => { $('ending').classList.add('hidden'); start(); });
+  $('home').addEventListener('click', () => { $('ending').classList.add('hidden'); overlay.classList.remove('hidden'); });
+
+  // 메뉴 범례 아이콘
+  document.querySelectorAll('.legend canvas').forEach(c => {
+    const d = window.devicePixelRatio || 1; c.width = c.height = 56*d;
+    const g = c.getContext('2d'); g.scale(d, d); g.translate(28, 28); DRAW[c.dataset.k](g);
+  });
+
+  // 입력
+  const moveTo = clientX => { if (!box) return; const r = cv.getBoundingClientRect(); box.tx = clientX - r.left; };
+  cv.addEventListener('pointerdown', e => moveTo(e.clientX));
+  cv.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) moveTo(e.clientX); });
+  addEventListener('keydown', e => { keys[e.key] = true; if ((e.key===' '||e.key==='Enter') && state !== 'play') start(); });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  addEventListener('resize', () => { resize(); if (state !== 'play') { reset(); } });
+  startBtn.addEventListener('click', start);
+
+  resize(); reset();
+  ctx.drawImage(bg, 0, 0, W, H);
+  if (best) result.textContent = `최고 ${best}점`;
+})();
+</script>
+</body>
+</html>
